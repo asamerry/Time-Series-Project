@@ -1,0 +1,144 @@
+---
+title: "SARIMA Modeling for the S&P 500"
+subtitle: "Pstat 274 Final Project"
+author: "Jake Merry"
+date: "06.06.2025"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\text{Var}}
+\newcommand{\Cov}{\text{Cov}}
+\newcommand{\MA}{\text{MA}}
+\newcommand{\SMA}{\text{SMA}}
+\newcommand{\AR}{\text{AR}}
+\newcommand{\SAR}{\text{SAR}}
+\newcommand{\ARMA}{\text{ARMA}}
+\newcommand{\ARIMA}{\text{ARIMA}}
+\newcommand{\ARI}{\text{ARI}}
+\newcommand{\IMA}{\text{IMA}}
+\newcommand{\SARIMA}{\text{SARIMA}}
+
+**Setup Chuck:**
+```{r setup, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(forecast)
+```
+
+```{r}
+snp <- read.csv("data/snpMonthly.csv")
+snp.ts <- ts(snp[, 2], start=c(2015, 6), end=c(2025, 4), frequency=12)
+
+index <- 1:length(snp.ts)
+
+plot(snp.ts, type='l')
+lines(tslm(snp.ts ~ trend)$fitted, col="red") # Linear trend
+lines(tslm(snp.ts ~ trend + I(trend^2))$fitted, col="blue") # Quadratic trend
+
+# Needs transformation to remove heteroskedasticity
+# Difference to remove seasonality and trend
+```
+```{r}
+var(snp.ts)
+```
+
+```{r}
+plot(decompose(snp.ts))
+```
+
+```{r}
+# Box-Cox transformation
+index <- 1:length(snp.ts)
+bcTransform <- boxcox(snp.ts ~ index, plotit=TRUE)
+
+lambda <- bcTransform$x[which(bcTransform$y == max(bcTransform$y))]
+lambda
+
+snp.bc <- (1/lambda)*(snp.ts^lambda - 1)
+
+plot.ts(snp.bc)
+```
+
+```{r}
+var(snp.bc)
+```
+
+```{r}
+plot(decompose(snp.bc))
+```
+
+```{r}
+# Differencing at lag 12
+snp.bc12 <- diff(snp.bc, 12)
+plot(snp.bc12)
+```
+
+```{r}
+var(snp.bc12)
+```
+
+```{r}
+plot(decompose(snp.bc12))
+```
+
+
+```{r}
+# Differencing at lag 1
+snp.bc1 <- diff(snp.bc12, 1)
+index <- 1:length(snp.bc1)
+plot(index, snp.bc1, type='l')
+abline(h=mean(snp.bc1), col="red")
+abline(lm(snp.bc1 ~ index), col="blue")
+```
+
+```{r}
+plot(decompose(snp.bc1))
+```
+
+```{r}
+mean(snp.bc1)
+var(snp.bc1)
+```
+
+```{r}
+acf(snp.bc1, lag.max=64)
+```
+```{r}
+pacf(snp.bc1, lag.max=64)
+```
+
+P = 2, Q = 1 $\\$
+p = 1, q = 0 or 1 (probably 1)
+
+So, after analyzing the sample ACF and PACF graphs for our data we attempt to fit the data to a $\SARIMA(1, 1, 1) \times (2, 1, 1)_{12}$ model.
+
+
+```{r}
+# Differencing at lag 2
+snp.bc2 <- diff(snp.bc12, 2)
+index <- 1:length(snp.bc2)
+plot(index, snp.bc2, type='l')
+#abline(h=mean(snp.bc2), col="red")
+#abline(lm(snp.bc2 ~ index), col="blue")
+```
+
+```{r}
+mean(snp.bc2)
+var(snp.bc2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
