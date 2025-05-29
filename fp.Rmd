@@ -1,5 +1,5 @@
 ---
-title: "SARIMA Modeling for the S&P 500"
+title: "SARIMA Modeling for the CBOE Volatility Index"
 subtitle: "Pstat 274 Final Project"
 author: "Jake Merry"
 date: "06.06.2025"
@@ -21,6 +21,10 @@ output:
 \newcommand{\IMA}{\text{IMA}}
 \newcommand{\SARIMA}{\text{SARIMA}}
 
+<!--
+Data collected monthly on 5.28.25 from https://fred.stlouisfed.org/series/VIXCLS# on the CBOE Volatility Index (VIX) 
+-->
+
 **Setup Chuck:**
 ```{r setup, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -29,20 +33,27 @@ library(forecast)
 ```
 
 ```{r}
-snp <- read.csv("data/snpMonthly.csv")
-snp.ts <- ts(snp[, 2], start=c(2015, 6), end=c(2025, 4), frequency=12)
+vix <- read.csv("data/vixMonthly.csv")
+vix.ts <- ts(snp[, 2], start=c(1990, 1), end=c(2025, 5), frequency=12)
+```
 
-index <- 1:length(snp.ts)
+```{r}
+train <- window(vix.ts, start=c(1990, 1), end=c(2023, 3), freq=12) # 400 obs
+test <- window(vix.ts, start=c(2023, 4), end=c(2025, 5), freq=12) # 25 obs
+```
 
-plot(snp.ts, type='l')
-lines(tslm(snp.ts ~ trend)$fitted, col="red") # Linear trend
-lines(tslm(snp.ts ~ trend + I(trend^2))$fitted, col="blue") # Quadratic trend
+```{r}
+index <- 1:length(vix.ts) # 1 - 400
+
+plot.ts(vix.ts, type='l')
+lines(tslm(train ~ trend)$fitted, col="red") # Linear trend
 
 # Needs transformation to remove heteroskedasticity
 # Difference to remove seasonality and trend
 ```
+
 ```{r}
-var(snp.ts)
+var(train)
 ```
 
 ```{r}
