@@ -1,5 +1,5 @@
 ---
-title: "SARIMA Modeling for the CBOE Volatility Index"
+title: "SARIMA Modeling for the M1 Supply"
 subtitle: "Pstat 274 Final Project"
 author: "Jake Merry"
 date: "06.06.2025"
@@ -8,21 +8,8 @@ output:
     latex_engine: xelatex
 ---
 
-\newcommand{\E}{\mathbb{E}}
-\newcommand{\Var}{\text{Var}}
-\newcommand{\Cov}{\text{Cov}}
-\newcommand{\MA}{\text{MA}}
-\newcommand{\SMA}{\text{SMA}}
-\newcommand{\AR}{\text{AR}}
-\newcommand{\SAR}{\text{SAR}}
-\newcommand{\ARMA}{\text{ARMA}}
-\newcommand{\ARIMA}{\text{ARIMA}}
-\newcommand{\ARI}{\text{ARI}}
-\newcommand{\IMA}{\text{IMA}}
-\newcommand{\SARIMA}{\text{SARIMA}}
-
 <!--
-Data collected monthly on 5.28.25 from https://fred.stlouisfed.org/series/VIXCLS# on the CBOE Volatility Index (VIX) 
+Data collected monthly on 5.28.25 from https://fred.stlouisfed.org/series/M1SL on the M1 monetary supply 
 -->
 
 **Setup Chuck:**
@@ -33,122 +20,167 @@ library(forecast)
 ```
 
 ```{r}
-vix <- read.csv("data/vixMonthly.csv")
-vix.ts <- ts(snp[, 2], start=c(1990, 1), end=c(2025, 5), frequency=12)
+m1 <- read.csv("data/m1Monthly.csv")
+m1.ts <- ts(m1[ ,2], start=c(1954, 7), end=c(2025, 5), frequency=12)
+plot.ts(m1.ts, type='l')
 ```
 
+We will restrict to 1990-2000 for analysis since the data perturbs considerably. 
+
 ```{r}
-train <- window(vix.ts, start=c(1990, 1), end=c(2023, 3), freq=12) # 400 obs
-test <- window(vix.ts, start=c(2023, 4), end=c(2025, 5), freq=12) # 25 obs
+train <- window(m1.ts, start=c(1990, 1), end=c(1999, 12), freq=12) # 120 obs
+test <- window(m1.ts, start=c(2000, 1), end=c(2001, 12), freq=12) # 24 obs
 ```
 
-```{r}
-index <- 1:length(vix.ts) # 1 - 400
 
-plot.ts(vix.ts, type='l')
+# Without Box-Cox Transformation
+
+```{r}
+plot.ts(train, type='l')
 lines(tslm(train ~ trend)$fitted, col="red") # Linear trend
+lines(tslm(train ~ trend + I(trend^2))$fitted, col="blue") # Quadratic trend
 
 # Needs transformation to remove heteroskedasticity
 # Difference to remove seasonality and trend
 ```
+
+Clear quadratic trend.
 
 ```{r}
 var(train)
 ```
 
 ```{r}
-plot(decompose(snp.ts))
-```
-
-```{r}
-# Box-Cox transformation
-index <- 1:length(snp.ts)
-bcTransform <- boxcox(snp.ts ~ index, plotit=TRUE)
-
-lambda <- bcTransform$x[which(bcTransform$y == max(bcTransform$y))]
-lambda
-
-snp.bc <- (1/lambda)*(snp.ts^lambda - 1)
-
-plot.ts(snp.bc)
-```
-
-```{r}
-var(snp.bc)
-```
-
-```{r}
-plot(decompose(snp.bc))
+plot(decompose(train))
 ```
 
 ```{r}
 # Differencing at lag 12
-snp.bc12 <- diff(snp.bc, 12)
-plot(snp.bc12)
+train.diff12 <- diff(train, 12)
+plot(train.diff12)
 ```
 
 ```{r}
-var(snp.bc12)
+var(train.diff12)
 ```
 
 ```{r}
-plot(decompose(snp.bc12))
+plot(decompose(train.diff12))
 ```
-
 
 ```{r}
 # Differencing at lag 1
-snp.bc1 <- diff(snp.bc12, 1)
-index <- 1:length(snp.bc1)
-plot(index, snp.bc1, type='l')
-abline(h=mean(snp.bc1), col="red")
-abline(lm(snp.bc1 ~ index), col="blue")
+train.diff1 <- diff(train.diff12, 1)
+index <- 1:length(train.diff1)
+plot(index, train.diff1, type='l')
+abline(h=mean(train.diff1), col="red")
+abline(lm(train.diff1 ~ index), col="blue")
 ```
 
 ```{r}
-plot(decompose(snp.bc1))
+plot(decompose(train.diff1))
 ```
 
 ```{r}
-mean(snp.bc1)
-var(snp.bc1)
+mean(train.diff1)
+var(train.diff1)
 ```
 
-```{r}
-acf(snp.bc1, lag.max=64)
-```
-```{r}
-pacf(snp.bc1, lag.max=64)
-```
-
-P = 2, Q = 1 $\\$
-p = 1, q = 0 or 1 (probably 1)
-
-So, after analyzing the sample ACF and PACF graphs for our data we attempt to fit the data to a $\SARIMA(1, 1, 1) \times (2, 1, 1)_{12}$ model.
-
+Variance still decreased so we accept both differences. 
 
 ```{r}
 # Differencing at lag 2
-snp.bc2 <- diff(snp.bc12, 2)
-index <- 1:length(snp.bc2)
-plot(index, snp.bc2, type='l')
-#abline(h=mean(snp.bc2), col="red")
-#abline(lm(snp.bc2 ~ index), col="blue")
+train.diff2 <- diff(train.diff12, lag=1, differences=2)
+index <- 1:length(train.diff2)
+plot(index, train.diff2, type='l')
+abline(h=mean(train.diff2), col="red")
+abline(lm(train.diff2 ~ index), col="blue")
 ```
 
 ```{r}
-mean(snp.bc2)
-var(snp.bc2)
+mean(train.diff2)
+var(train.diff2)
 ```
 
+Variance significantly higher than differncing only once at lag 1. Reject second differencing, keep at 1. 
 
 
+# With Box-Cox Transformation
 
+```{r}
+# Box-Cox transformation
+index <- 1:length(train)
+bcTransform <- boxcox(train ~ index, plotit=TRUE)
 
+lambda <- bcTransform$x[which(bcTransform$y == max(bcTransform$y))]
+lambda
 
+train.bc <- (1/lambda)*(train^lambda - 1)
 
+plot.ts(train.bc)
+```
 
+```{r}
+var(train.bc)
+```
 
+```{r}
+plot(decompose(train.bc))
+```
+
+```{r}
+# Differencing at lag 12
+train.bc12 <- diff(train.bc, 12)
+plot(train.bc12)
+```
+
+```{r}
+var(train.bc12)
+```
+
+```{r}
+plot(decompose(train.bc12))
+```
+
+```{r}
+# Differencing at lag 1
+train.bc1 <- diff(train.bc12, 1)
+index <- 1:length(train.bc1)
+plot(index, train.bc1, type='l')
+abline(h=mean(train.bc1), col="red")
+abline(lm(train.bc1 ~ index), col="blue")
+```
+
+```{r}
+plot(decompose(train.bc1))
+```
+
+```{r}
+mean(train.bc1)
+var(train.bc1)
+```
+
+```{r}
+# Differencing at lag 2
+train.bc2 <- diff(train.bc12, lag=1, differences=2)
+index <- 1:length(train.bc2)
+plot(index, train.bc2, type='l')
+abline(h=mean(train.bc2), col="red")
+abline(lm(train.bc2 ~ index), col="blue")
+```
+
+```{r}
+mean(train.bc2)
+var(train.bc2)
+```
+
+Variance again higher than differencing only once at lag 1.
+
+We choose to use the Box-Cox Transformation and difference once at lag 1 and once at lag 12. 
+
+```{r}
+m1 <- train.bc1
+```
 
 
 
