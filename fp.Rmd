@@ -56,7 +56,7 @@ m1.ts <- ts(m1_raw[ ,2], start=c(1959, 1), end=c(2025, 4), frequency=12)
 plot.ts(m1.ts, type='l', ylab="Dollars in Billions", main="Plot of M1 Series from 1959 to 2025")
 ```
 
-The main problem that we see here is that around 2020 (COVID years), the data spikes considerably. This would not only make prediction of these years extremely difficult, but would also influence our model in ways that would make forecasting past these dates inaccurate. Hence, we will restrict to data before the year 2000. Specifically, our training set will consist of data from January 1959 to December 1999, and our testing set will consist of the data from January 2000 to December 2001. We will denote the training series as $X_t$.
+The main problem that we see here is that around 2020 (when the COVID recession hit), the data spikes considerably. This would not only make prediction of these years extremely difficult, but would also influence our model in ways that would make forecasting past these dates inaccurate. Hence, we will restrict to data before the year 2000. Specifically, our training set will consist of data from January 1959 to December 1999, and our testing set will consist of the data from January 2000 to December 2001. We will denote the training series as $X_t$.
 
 ```{r}
 X_t <- window(m1.ts, start=c(1959, 1), end=c(1999, 12), freq=12) # 492 obs
@@ -500,185 +500,226 @@ Our main problem in this analysis was that the residuals of this model $\{Z_t\}$
 Below is a report of the R code used for this project, with comments to direct the reader to which codes were used for each part of the project:
 
 ```{r echo=TRUE, eval=FALSE}
-# Data Analysis
-## Exploration of Data Set
+#-------------------------#
+# Exploration of Data Set #
+#-------------------------#
+
+# Import data and plot
 m1_raw <- read.csv("data/m1Monthly.csv")
 m1.ts <- ts(m1_raw[ ,2], start=c(1959, 1), end=c(2025, 4), frequency=12)
-plot.ts(m1.ts, type='l')
-  # Split into training and test sets
-train <- window(m1.ts, start=c(1959, 1), end=c(1999, 12), freq=12) # 480 obs
-test <- window(m1.ts, start=c(2000, 1), end=c(2001, 12), freq=12) # 24 obs
-  # Plot training set
-plot.ts(train, type='l')
-lines(tslm(train ~ trend)$fitted, col="red") # Linear trend
-lines(tslm(train ~ trend + I(trend^2))$fitted, col="blue") # Quadratic trend
-var(train)
-plot(decompose(train))
+plot.ts(m1.ts, type='l', ylab="Dollars in Billions", 
+        main="Plot of M1 Series from 1959 to 2025")
 
-  # Box-Cox transformation
-index <- 1:length(train)
-bcTransform <- boxcox(train ~ index, plotit=TRUE)
+# Training and testing sets
+X_t <- window(m1.ts, start=c(1959, 1), end=c(1999, 12), freq=12) # 492 obs
+test <- window(m1.ts, start=c(2000, 1), end=c(2001, 12), freq=12) # 24 obs
+
+# Plot training data
+plot.ts(X_t, type='l', ylab=expression(X[t]), main="Plot of Training Data")
+lines(tslm(X_t ~ trend)$fitted, col="red") # Linear trend
+lines(tslm(X_t ~ trend + I(trend^2))$fitted, col="blue") # Quadratic trend
+var(X_t)
+plot(decompose(X_t))
+
+#---------------------#
+# Data Transformation #
+#---------------------#
+
+# Box-Cox transformation
+index <- 1:length(X_t)
+bcTransform <- boxcox(X_t ~ index, plotit=TRUE)
 lambda <- bcTransform$x[which(bcTransform$y == max(bcTransform$y))]
 lambda
-train.bc <- train^lambda
-#train.bc <- (1/lambda)*(train^lambda - 1)
-plot.ts(train.bc)
-var(train.bc)
-plot(decompose(train.bc))
+Y_t <- X_t^lambda
+plot.ts(Y_t, ylab=expression(Y[t]), main="Box-Cox Transformed Series")
+var(Y_t)
+plot(decompose(Y_t))
 
-  # Difference twice at lag 1
-train.diff2 <- diff(train.bc, lag=1, differences=2)
-index <- 1:length(train.diff2)
-plot(train.diff2)
-abline(h=mean(train.diff2), col="red")
-abline(lm(train.diff2 ~ index), col="blue")
-var(train.diff2)
-m1 <- train.diff2
+# Difference twice at lag 1
+U_t <- diff(Y_t, lag=1, differences=2)
+index <- 1:length(U_t)
+plot(U_t, ylab=expression(U[t]), main="Series Differenced Twice at Lag 1")
+abline(h=mean(U_t), col="red")
+abline(lm(U_t ~ index), col="blue")
+var(U_t)
 
-## Model Selection
-  # ACF and PACFS
+#-----------------#
+# Model Selection #
+#-----------------#
+
+# ACF and PACF to lag 12
 par(mfrow=c(1, 2))
-acf(m1, lag.max=12) # To lag 12
-pacf(m1, lag.max=12)
-par(mfrow=c(1, 2))
-acf(m1, lag.max=60) # To lag 60
-pacf(m1, lag.max=60)
+acf(U_t, lag.max=12, main="")
+pacf(U_t, lag.max=12, main="")
+title(main=expression(paste("ACF and PACF for ", U[t], " to Lag 12")), 
+      line=-2.5, outer=TRUE)
 
-  # AICc Selection
-    # Model 1
-arima(train.bc, order=c(8, 2, 4), seasonal=list(order=c(1, 0, 1), 
+# ACF and PACF to lag 60
+par(mfrow=c(1, 2))
+acf(U_t, lag.max=60, main="")
+pacf(U_t, lag.max=60, main="")
+title(main=expression(paste("ACF and PACF for ", U[t], " to Lag 60")), 
+      line=-2.5, outer=TRUE)
+
+# AICc selection
+  # Model 1
+arima(Y_t, order=c(8, 2, 4), seasonal=list(order=c(1, 0, 1), 
       period=12), method="ML")
-arima(train.bc, order=c(3, 2, 3), seasonal=list(order=c(1, 0, 1), 
+arima(Y_t, order=c(3, 2, 3), seasonal=list(order=c(1, 0, 1), 
       period=12), fixed=c(NA, NA, NA, 0, 0, NA, NA, NA), method="ML")
-    # Model 2
-arima(train.bc, order=c(8, 2, 4), 
-      method="ML")
-arima(train.bc, order=c(7, 2, 4), 
-      fixed=c(NA, NA, NA, 0, 0, 0, NA, NA, NA, 0, NA), method="ML")
-    # Model 3
-arima(train.bc, order=c(2, 2, 4), seasonal=list(order=c(1, 0, 1), 
+  # Model 2
+arima(Y_t, order=c(2, 2, 4), seasonal=list(order=c(1, 0, 1), 
       period=12), method="ML")
-arima(train.bc, order=c(2, 2, 4), seasonal=list(order=c(1, 0, 1), 
+arima(Y_t, order=c(2, 2, 4), seasonal=list(order=c(1, 0, 1), 
       period=12), fixed=c(NA, NA, NA, 0, NA, NA, NA, NA), method="ML")
+  # Model 3
+arima(Y_t, order=c(8, 2, 4), method="ML")
+arima(Y_t, order=c(7, 2, 4), fixed=c(NA, NA, NA, 0, 0, 0, NA, NA, NA, 0, NA), 
+      method="ML")
 
-  # Plotting roots relative to the unit circle
-    # Model 1
+# Unit circle plots of roots
+  # Model 1
 par(mfrow=c(2, 2))
 uc.check(pol_=c(1, 0.6377, 0.5652, -0.2884), print_output=F)
 uc.check(pol_=c(1, -0.4271), print_output=F)
 uc.check(pol_=c(1, 0, 0, -0.6824), print_output=F)
 uc.check(pol_=c(1, -0.6721), print_output=F)
-    # Model 2
-par(mfrow=c(1, 2))
-uc.check(pol_=c(1, 0.3299, 0.7292, 0.4126, 0, 0, 0, 0.0958), print_output=F)
-uc.check(pol_=c(1, -0.2561, 0.2826, 0, -0.5742), print_output=F)
-    # Model 3
+  # Model 2
 par(mfrow=c(2, 2))
 uc.check(pol_=c(1, 0.9654, 0.8407), print_output=F)
 uc.check(pol_=c(1, -0.4341), print_output=F)
 uc.check(pol_=c(1, 0.3452, 0, -0.6380, -0.2303), print_output=F)
 uc.check(pol_=c(1, -0.6606), print_output=F)
+  # Model 3
+par(mfrow=c(1, 2))
+uc.check(pol_=c(1, 0.3299, 0.7292, 0.4126, 0, 0, 0, 0.0958), print_output=F)
+uc.check(pol_=c(1, -0.2561, 0.2826, 0, -0.5742), print_output=F)
 
-## Diagnostic Checking
-  # Select Models 1 and 3
-model1 <- arima(train.bc, order=c(3, 2, 3), seasonal=list(order=c(1, 0, 1), 
+model1 <- arima(Y_t, order=c(3, 2, 3), seasonal=list(order=c(1, 0, 1), 
                 period=12), fixed=c(NA, NA, NA, 0, 0, NA, NA, NA), method="ML")
-model3 <- arima(train.bc, order=c(2, 2, 4), seasonal=list(order=c(1, 0, 1), 
+model2 <- arima(Y_t, order=c(2, 2, 4), seasonal=list(order=c(1, 0, 1), 
                 period=12), fixed=c(NA, NA, NA, 0, NA, NA, NA, NA), method="ML")
-  # Pull residuals
-res1 <- model1$residuals
-res3 <- model3$residuals
 
-    # Model 1
+#---------------------#
+# Diagnostic Checking #
+#---------------------#
+
+# Pull residuals
+res1 <- model1$residuals
+res2 <- model2$residuals
+
+# Model 1
+  # Plot residuals
 index <- 1:length(res1)
-plot(res1) # Plot Residuals
+plot(res1, ylab="", main="Model 1 Residuals")
 abline(h=mean(res1), col="red")
 abline(lm(res1 ~ index), col="blue")
-par(mfrow=c(1, 2)) # Histogram with normal curve and QQ-Plot
-hist(res1)
+  # Histogram and Q-Q plots
+par(mfrow=c(1, 2))
+hist(res1, xlab="Residuals", main="")
 m <- mean(res1)
 sd <- sqrt(var(res1))
 curve(dnorm(x, m, sd), add=TRUE)
-qqnorm(res1)
+qqnorm(res1, main="")
 qqline(res1)
-par(mfrow=c(1, 2)) # ACF and PACF
-acf(res1)
-pacf(res1)
-    # Portmanteau Tests
-shapiro.test(res1) #Shapiro
-Box.test(res1, lag=21, type=c("Box-Pierce"), fitdf=6) # Box-Pierce
-Box.test(res1, lag=21, type=c("Ljung-Box"), fitdf=6) # Ljung-Box
-Box.test(res1^2, lag=21, type=c("Ljung-Box"), fitdf=0) #McLeod-Li
+title(main="Histogram and Q-Q Plot of Model 1 Residuals", line=-2, outer=TRUE)
+  # Plot ACF and PACF
+par(mfrow=c(1, 2)) 
+acf(res1, main="")
+pacf(res1, main="")
+title(main="ACF and PACF of Model 1 Residuals", line=-2, outer=TRUE)
+  #Portmanteau tests
+shapiro.test(res1) # Shapiro
+Box.test(res1, lag=22, type=c("Box-Pierce"), fitdf=6) # Box-Pierce
+Box.test(res1, lag=22, type=c("Ljung-Box"), fitdf=6) # Ljung-Box
+Box.test(res1^2, lag=22, type=c("Ljung-Box"), fitdf=0) # McLeod-Li
 
-    # Model 3
-index <- 1:length(res3)
-plot(res3) # Plot residuals
-abline(h=mean(res3), col="red")
-abline(lm(res3 ~ index), col="blue")
-par(mfrow=c(1, 2)) # Histogram with normal curve and QQ-PLot
-hist(res3)
-m <- mean(res3)
-sd <- sqrt(var(res3))
+# Model 2
+  # Plot residuals
+index <- 1:length(res2)
+plot(res2, ylab="", main="Model 2 Residuals")
+abline(h=mean(res2), col="red")
+abline(lm(res2 ~ index), col="blue")
+  # Histogram and Q-Q plots
+par(mfrow=c(1, 2))
+hist(res2, xlab="Residuals", main="")
+m <- mean(res2)
+sd <- sqrt(var(res2))
 curve(dnorm(x, m, sd), add=TRUE)
-qqnorm(res3)
-qqline(res3)
-par(mfrow=c(1, 2)) # ACF and PACF
-acf(res3)
-pacf(res3)
-      # Portmanteau Tests
-shapiro.test(res3) # Shapiro
-Box.test(res3, lag=21, type=c("Box-Pierce"), fitdf=7) # Box-Pierce
-Box.test(res3, lag=21, type=c("Ljung-Box"), fitdf=7) # Ljung-Box
-Box.test(res3^2, lag=21, type=c("Ljung-Box"), fitdf=0) # McLeod-Li
+qqnorm(res2, main="")
+qqline(res2)
+title(main="Histogram and Q-Q Plot of Model 2 Residuals", line=-2, outer=TRUE)
+  # Plot ACF and PACF
+par(mfrow=c(1, 2))
+acf(res2, main="")
+pacf(res2, main="")
+title(main="ACF and PACF of Model 2 Residuals", line=-2, outer=TRUE)
+  # Portmanteau tests
+shapiro.test(res2) # Shapiro
+Box.test(res2, lag=22, type=c("Box-Pierce"), fitdf=7) # Box-Pierce
+Box.test(res2, lag=22, type=c("Ljung-Box"), fitdf=7) # Ljung-Box
+Box.test(res2^2, lag=22, type=c("Ljung-Box"), fitdf=0) # McLeod-Li
 
-## Forecasting
-  # 2-Year Prediction
+#-------------#
+# Forecasting #
+#-------------#
+
+# Make predictions
 pred.tr <- predict(model1, n.ahead=24)
 U.tr <- pred.tr$pred + 2*pred.tr$se
 L.tr <- pred.tr$pred - 2*pred.tr$se
-    # Convert to original scale
+
+# Convert to original scale
 pred.orig <- pred.tr$pred^(1/lambda)
 U = U.tr^(1/lambda)
 L = L.tr^(1/lambda)
-plot.ts(m1.ts, xlim=c(1960, 2010), ylim=c(0, 3000))
+
+# Plot forecasts
+plot.ts(m1.ts, xlim=c(1960, 2010), ylim=c(0, 3000), xlab="Dollars in Billions", 
+        main="Forecast of M1 Supply")
 lines(U, col="blue", lty="dashed")
 lines(L, col="blue", lty="dashed")
-points(seq(1960+length(train.bc)/12-1, 1960+length(train.bc)/12+1, 
+points(seq(1960+length(Y_t)/12-1, 1960+length(Y_t)/12+1, 
            length.out=length(pred.tr$pred)), pred.orig, col="red")
-    # Zoomed-in plot
-plot.ts(m1.ts, xlim=c(1999, 2003), ylim=c(700, max(U)+400))
+
+# Plot zoomed-in forecasts
+plot.ts(m1.ts, xlim=c(1999, 2003), ylim=c(700, max(U)+400), xlab="Dollars in Billions", 
+        main="Zoomed-In Forecast of M1 Supply")
 lines(U, col="blue", lty="dashed")
 lines(L, col="blue", lty="dashed")
-points(seq(1960+length(train.bc)/12-1, 1960+length(train.bc)/12+1, 
+points(seq(1960+length(Y_t)/12-1, 1960+length(Y_t)/12+1, 
            length.out=length(pred.tr$pred)), pred.orig, col="red")
-  # 23-Year Prediction
+
+# Make long-term predictions
 pred.tr <- predict(model1, n.ahead=276)
 U.tr <- pred.tr$pred + 2*pred.tr$se
 L.tr <- pred.tr$pred - 2*pred.tr$se
-    # Convert to original scale
+
+# Convert to original scale
 pred.orig <- pred.tr$pred^(1/lambda)
 U = U.tr^(1/lambda)
 L = L.tr^(1/lambda)
-plot.ts(m1.ts, xlim=c(1960, 2025), ylim=c(0, 5000))
+
+# Plot long-term forecasts
+plot.ts(m1.ts, xlim=c(1960, 2025), ylim=c(0, 5000), xlab="Dollars in Billions", 
+        main="Long-Term Forecast of M1 Supply")
 lines(U, col="blue", lty="dashed")
 lines(L, col="blue", lty="dashed")
-points(seq(1960+length(train.bc)/12-1, 1960+length(train.bc)/12+22, 
-           length.out=length(pred.tr$pred)), pred.orig, col="red")
-    # Zoomed-in plot
-plot.ts(m1.ts, xlim=c(1999, 2025), ylim=c(700, max(U)+1500))
-lines(U, col="blue", lty="dashed")
-lines(L, col="blue", lty="dashed")
-points(seq(1960+length(train.bc)/12-1, 1960+length(train.bc)/12+22, 
+points(seq(1960+length(Y_t)/12-1, 1960+length(Y_t)/12+22, 
            length.out=length(pred.tr$pred)), pred.orig, col="red")
 
-## Spectral Analysis
-TSA::periodogram(m1.ts)
-fisher.g.test(res1)
-cpgram(res1)
+# Plot zoomed-in long-term forecasts
+plot.ts(m1.ts, xlim=c(1999, 2025), ylim=c(700, max(U)+1500), xlab="Dollars in Billions", 
+        main="Zoomed-In Long-Term Forecast of M1 Supply")
+lines(U, col="blue", lty="dashed")
+lines(L, col="blue", lty="dashed")
+points(seq(1960+length(Y_t)/12-1, 1960+length(Y_t)/12+22, 
+           length.out=length(pred.tr$pred)), pred.orig, col="red")
+
+#-------------------#
+# Spectral Analysis #
+#-------------------#
+TSA::periodogram(Y_t) # Periodogram
+fisher.g.test(res1) # Fisher test
+cpgram(res1) # Kolmoogorov-Smirnov Test
 ```
-
-
-
-
-
-
