@@ -11,15 +11,12 @@ output:
 \newcommand{\SARIMA}{\text{SARIMA}}
 \newcommand{\ARIMA}{\text{ARIMA}}
 
-<!--
-Data collected monthly on 5.28.25 from https://fred.stlouisfed.org/series/M1SL on the M1 monetary supply 
--->
-
 <!-- -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- -->
 # Abstract
 <!-- -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- -->
 
-We analyze the U.S. M1 monetary supply in order to produce short-term forecasts of economic growth. We begin by transforming the data to create a stationary series in order to apply Box-Jenkins methodology and fit the data set to a SARIMA model. We perform diagnostic checks and spectral analysis to ensure the validity of our chosen model. Using the fitted $\SARIMA(3, 2, 3) \times (1, 0, 1)_{12}$ model, we are able to forecast observations 2 years in advance. These predictions help us better understand the influence of trend and seasonality on liquid assets and gain insight into how public spending and bank lending changes with time. 
+We analyze the U.S. M1 monetary supply in order to produce short-term forecasts of economic growth. We begin by transforming the data to create a stationary series in order to apply Box-Jenkins methodology and fit the data set to a SARIMA model. We perform diagnostic checks and spectral analysis to ensure the validity of our chosen model. Using the fitted $\SARIMA(3, 2, 3) \times (1, 0, 1)_{12}$ model, we are able to forecast observations 24 months in advance. These predictions help us better understand the influence of trend and seasonality on liquid assets and gain insight into how public spending and bank lending changes with time. 
+
 
 <!-- -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- -->
 # Introduction
@@ -29,7 +26,7 @@ The M1, M2, and M3 monetary aggregates are measures of the U.S. money supply and
 
 The monthly data used in this report was downloaded on May 28, 2025 from the **[Federal Reserve Bank of St. Louis](https://fred.stlouisfed.org/series/M1SL)**. Our main goal in this report is to use Box-Jenkins methodology to fit this data set to a SARIMA model of the form $X_t = m_t + s_t + S_t$, where $m_t$ is the trend component, $s_t$ is the seasonal component, and $S_t$ is a stationary process. We do this in order to forecast future observations up to 24 months in advance. In doing so, we hope to gain insight into how public spending and bank lending changes with time. 
 
-The steps taken to forecast this data set are standard. We first perform data transformations to achieve a stationary series. We then examine ACFs and PACFS, as well as AICc values, in order to pick candidate models to fit the series. Next, we check invertiblilty and causality of the selected models and perform diagnostic checking of the residuals to ensure homoskedasticity, and finally we can forecast future values using the selected model. Additionally, we will also perform spectral analysis to ensure that the period we chose for our model is accurate.
+The steps taken to forecast this data set are standard. We first perform data transformations to achieve a stationary series. We then examine ACFs and PACFs, as well as AICc values, in order to pick candidate models to fit the series. Next, we check invertiblilty and causality of the selected models and perform diagnostic checking of the residuals to ensure homoskedasticity, and finally we can forecast future values using the selected model. Additionally, we will also perform spectral analysis to ensure that the period we chose for our model is accurate.
 
 Below is the setup chunk used for the report, including all libraries used:
 ```{r setup, message=FALSE}
@@ -39,6 +36,7 @@ library(UnitCircle)
 library(TSA)
 library(GeneCycle)
 ```
+
 
 <!-- -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- -->
 # Data Analysis
@@ -65,13 +63,13 @@ test <- window(m1.ts, start=c(2000, 1), end=c(2001, 12), freq=12) # 24 obs
 
 We can then plot the training set to get a better idea of the specific problem we are faced with. 
 
-```{r fig.dim=c(6, 3.9)}
+```{r}
 plot.ts(X_t, type='l', ylab=expression(X[t]), main="Plot of Training Data")
 lines(tslm(X_t ~ trend)$fitted, col="red") # Linear trend
 lines(tslm(X_t ~ trend + I(trend^2))$fitted, col="blue") # Quadratic trend
 ```
 
-Our training data appears to follow a quadratic trend, so we note that differencing twice lag one may be our best bet for creating a stationary series. First, however, we take note of the current variance of the data set:  
+Our training data appears to follow a quadratic trend, so we note that differencing twice at lag one may be our best bet for creating a stationary series. First, however, we take note of the current variance of the data set:  
 
 ```{r}
 var(X_t)
@@ -116,13 +114,13 @@ Y_t <- X_t^lambda
 plot.ts(Y_t, ylab=expression(Y[t]), main="Box-Cox Transformed Series")
 ```
 
-And, observing the new variance, we have
+And we observe the new variance as
 
 ```{r}
 var(Y_t)
 ```
 
-which is considerably lower than the variance of the original data set (123121.6). Hence, we accept this transformation as valid for our scenario. Then, plotting the decomposed series, we observe
+which is considerably lower than the variance of the original data set (123121.6). Hence, we accept this transformation as valid in this scenario. Then, plotting the decomposed series, we observe
 
 ```{r}
 plot(decompose(Y_t))
@@ -145,7 +143,7 @@ Observing the new variance as
 var(U_t)
 ```
 
-it is clear that $U_t$ is stationary and is the best presentation of the series for our purposes. 
+it is clear that $U_t$ is stationary and is the best representation of the series for our purposes. 
 
 
 <!-- --------------------------------- -->
@@ -215,13 +213,13 @@ The only model with the same $\SARIMA$ representation as the original candidates
 
 \begin{enumerate}
   \item $\SARIMA(3, 2, 3) \times (1, 0, 1)_{12}$ given by
-  $$(1 + 0.6377B + 0.5652B^2 - 0.2884B^3)(1 - 0.4271B^{12})U_t = (1 - 0.6824B^3)(1 - 0.6721B^{12})Z_t$$
+  $$(1 + 0.6378B + 0.5652B^2 - 0.2884B^3)(1 - 0.4271B^{12})U_t = (1 - 0.6824B^3)(1 - 0.6721B^{12})Z_t$$
   with AICc $= -6791.23$. 
   \item $\SARIMA(2, 2, 4) \times (1, 0, 1)_{12}$ given by
-  $$(1 + 0.9654B + 0.8407B^2)(1 - 0.4341B^{12})U_t = (1 + 0.3452B - 0.6380B^3 - 0.2303B^4)(1 - 0.6606B^{12})Z_t$$
+  $$(1 + 0.9684B + 0.8432B^2)(1 - 0.4333B^{12})U_t = (1 + 0.3480B - 0.6406B^3 - 0.2298B^4)(1 - 0.6603B^{12})Z_t$$
   with AICc $= -6791.85$.
   \item $\ARIMA(7, 0, 4)$ given by
-  $$(1 + 0.3299B + 0.7292B^2 + 0.4126B^3 + 0.0958B^7)U_t = (1 - 0.2561B + 0.2826B^2 - 0.5742B^4)Z_t$$
+  $$(1 + 0.3309B + 0.7292B^2 + 0.4130B^3 + 0.0958B^7)U_t = (1 - 0.2551B + 0.2821B^2 - 0.5745B^4)Z_t$$
   with AICc $= -6772.35$.
 \end{enumerate}
 
@@ -259,7 +257,7 @@ uc.check(pol_=c(1, 0.3299, 0.7292, 0.4126, 0, 0, 0, 0.0958), print_output=F)
 uc.check(pol_=c(1, -0.2561, 0.2826, 0, -0.5742), print_output=F)
 ```
 
-The roots of $\phi(B)$, $\Phi(B)$, $\theta(B)$, and $\Theta(B)$ for all three models all lay strictly outside of the unit circle, and hence every model is casual and invertible. Hence, we choose drop Model 3 from our current analysis since this is the model with the highest AICc value. 
+The roots of $\phi(B)$, $\Phi(B)$, $\theta(B)$, and $\Theta(B)$ for all three models all lay strictly outside of the unit circle, and hence every model is casual and invertible. Thus, we choose drop Model 3 from our current analysis since this is the model with the highest AICc value. 
 
 ```{r}
 model1 <- arima(Y_t, order=c(3, 2, 3), seasonal=list(order=c(1, 0, 1), period=12), fixed=c(NA, NA, NA, 0, 0, NA, NA, NA), method="ML")
@@ -418,11 +416,11 @@ lines(L, col="blue", lty="dashed")
 points(seq(1960+length(Y_t)/12-1, 1960+length(Y_t)/12+1, length.out=length(pred.tr$pred)), pred.orig, col="red")
 ```
 
-We see that our prediction is fairly accurate. The true values of the M1 supply tend to ride along the lower confidence interval of our predictions, but never stray too far from our forecasted values. As a note, if we had simply predicted values 12 months in advance, our predictions would have never truely matched the test data, but at month 20, we are very close to the actual value. 
+We see that our prediction is fairly accurate. The true values of the M1 supply tend to ride along the lower confidence interval of our predictions, but never stray too far from our forecasted values. As a note, if we had simply predicted values 12 months in advance, our predictions would have never truly matched the test data, but at month 20, we are very close to the actual value. 
 
 \pagebreak
 
-Mostly for fun, we can also see what happens if we were to attempt to use this model to predict values much further into the future. With the original thought being to see how far off our predictions are from the data of 2020, when the data spikes, seemingly uncontrollably, we will make forecasts 276 months (23 years) into the future. 
+Mostly for fun, but also because the data set we started with was relatively smooth, we can also see what happens if we were to attempt to use this model to predict values much further into the future. With the original thought being to see how far off our predictions are from the data in 2020, when the data spikes seemingly uncontrollably, we will make forecasts 276 months (23 years) into the future. 
 
 ```{r}
 pred.tr <- predict(model1, n.ahead=276)
@@ -447,7 +445,7 @@ lines(L, col="blue", lty="dashed")
 points(seq(1960+length(Y_t)/12-1, 1960+length(Y_t)/12+22, length.out=length(pred.tr$pred)), pred.orig, col="red")
 ```
 
-Ideally, we would have had somewhat accurate predictions until about 2020 when the original data exploded, but this is simply not plausible for financial data, especially with such a simply model. Our data actually seems to lose accuracy at around 2008. This is the year that the first major recession of this century took place, which is not something that was originally considered in the project. Looking back at the original data, we can see that there is actually a smaller rise in the trend of the data around this time, but was overshadowed by the large spike in 2020. However, having a even a somewhat accurate prediction 8 years ahead of the training data doesn't seem too bad in this scenario. 
+Ideally, we would have had somewhat accurate predictions until about 2020 when the original data exploded, but this is simply not plausible for financial data, especially with such a simple model. Our data actually seems to lose accuracy at around 2008. This is the year that the first major recession of this century took place, which is not something that was originally considered in the project. Looking back at the original data, we can see that there is actually a smaller rise in the trend of the data around this time, but was overshadowed by the large spike in 2020. However, what this tells us is that we have well-predicted the general trend of the data set, rather than short-term deviations. This is most likely due to the fact that we were unable to produce Gaussian residuals. 
 
 
 <!-- --------------------------------- -->
@@ -460,7 +458,7 @@ We will now consider the model defined by $X_t = \mu + a\cos(\omega t) + b\sin(\
 TSA::periodogram(Y_t)
 ```
 
-The graph of the periodogram shows does not show ant large spikes, and we can hence say that our data does not display a significant periodicity or seasonality. This is consistent with our observation from before. Now, performing the Fisher test, we see
+The graph of the periodogram shows does not show any large spikes, and we can hence say that our data does not display a significant periodicity or seasonality. This is consistent with our observation from before. Now, performing the Fisher test, we see
 
 ```{r}
 fisher.g.test(res1)
@@ -475,13 +473,13 @@ cpgram(res1)
 Since the plot stays entirely within the confidence intervals, we see that our residuals also pass this test of normality. However, even though they have passed these two tests, we already know from the Shapiro and McLeod-Li tests that our residuals have some sort of nonlinear dependence between them. 
 
 
-<!-- -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- -->
-# Conclusion
-<!-- -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- -->
+<!-- --------------------------------- -->
+## Conclusion
+<!-- --------------------------------- -->
 
-The objective for this report was to forecast values of the M1 monetary aggregate up to 24 months in advance. We fitted our data to a $\SARIMA(3, 2, 3) \times (1, 0, 1)_{12}$ model given by the algebraic expression
-$$(1 + 0.6377B + 0.5652B^2 - 0.2884B^3)(1 - 0.4271B^{12})(1-B)^2X_t^{-0.1818182} = (1 - 0.6824B^3)(1 - 0.6721B^{12})Z_t.$$
-Our main problem in this analysis was that the residuals of this model $\{Z_t\}$ did not follow a Gaussian white noise process. Despite this, we were still able to fairly accurately predict future values of the series up to 24 months in advance. Additionally, we performed spectral analysis that certified some claims we made earlier in the report about the seasonality of our data set. 
+The objective for this report was to forecast values of the M1 monetary aggregate up to 24 months in advance. After transforming our data set, we fitted it to a $\SARIMA(3, 2, 3) \times (1, 0, 1)_{12}$ model given by the algebraic expression
+$$(1 + 0.6378B + 0.5652B^2 - 0.2884B^3)(1 - 0.4271B^{12})(1-B)^2X_t^{-0.1818182} = (1 - 0.6824B^3)(1 - 0.6721B^{12})Z_t.$$
+Our main problem in this analysis was that the residuals of this model, $\{Z_t\}$, did not follow a Gaussian white noise process. Despite this, we were still able to fairly accurately predict future values of the series up to 24 months in advance. Additionally, we performed spectral analysis that certified some claims we made earlier in the report about the seasonality of our data set. 
 
 
 <!-- -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- -->
@@ -721,5 +719,5 @@ points(seq(1960+length(Y_t)/12-1, 1960+length(Y_t)/12+22,
 #-------------------#
 TSA::periodogram(Y_t) # Periodogram
 fisher.g.test(res1) # Fisher test
-cpgram(res1) # Kolmoogorov-Smirnov Test
+cpgram(res1) # Kolmogorov-Smirnov Test
 ```
